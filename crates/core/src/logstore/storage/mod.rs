@@ -109,6 +109,9 @@ pub struct CertificateConfig {
 }
 
 /// Read a PEM certificate file and build [`object_store::ClientOptions`] with it.
+///
+/// Requires the object_store `tls` feature and a local filesystem, so it is unavailable on wasm32.
+#[cfg(not(target_family = "wasm"))]
 pub fn client_options_from_certificate(path: &str) -> DeltaResult<object_store::ClientOptions> {
     let mut buf = Vec::new();
     std::fs::File::open(path)

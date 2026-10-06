@@ -58,6 +58,7 @@ use delta_kernel::log_segment::LogSegment;
 use delta_kernel::path::{LogPathFileType, ParsedLogPath};
 use delta_kernel::{AsAny, Engine};
 use delta_kernel_default_engine::DefaultEngineBuilder;
+#[cfg(not(target_family = "wasm"))]
 use delta_kernel_default_engine::executor::tokio::{
     TokioBackgroundExecutor, TokioMultiThreadExecutor,
 };
@@ -69,6 +70,7 @@ use serde::de::{Error, SeqAccess, Visitor};
 use serde::ser::SerializeSeq;
 use serde::{Deserialize, Serialize};
 use serde_json::Deserializer;
+#[cfg(not(target_family = "wasm"))]
 use tokio::runtime::RuntimeFlavor;
 use tracing::*;
 use url::Url;
@@ -91,8 +93,10 @@ pub use self::scope::{OperationContext, OperationScope, OperationTransaction, Sc
 pub use self::storage::utils::commit_uri_from_version;
 pub use self::storage::{
     DefaultObjectStoreRegistry, DeltaIOStorageBackend, IORuntime, ObjectStoreRef,
-    ObjectStoreRegistry, ObjectStoreRetryExt, client_options_from_certificate,
+    ObjectStoreRegistry, ObjectStoreRetryExt,
 };
+#[cfg(not(target_family = "wasm"))]
+pub use self::storage::client_options_from_certificate;
 /// Convenience re-export of the object store crate
 pub use ::object_store;
 
@@ -594,19 +598,34 @@ impl<T: LogStore + ?Sized> LogStore for Arc<T> {
 }
 
 pub(crate) fn get_engine(store: Arc<dyn ObjectStore>) -> Arc<dyn Engine> {
-    let handle = tokio::runtime::Handle::current();
-    match handle.runtime_flavor() {
-        RuntimeFlavor::MultiThread => Arc::new(
+    // On wasm32 there is no thread-based tokio runtime; use the fork's JSPI executor.
+    #[cfg(target_family = "wasm")]
+    {
+        return Arc::new(
             DefaultEngineBuilder::new(store)
-                .with_task_executor(Arc::new(TokioMultiThreadExecutor::new(handle)))
+                .with_task_executor(Arc::new(
+                    delta_kernel_default_engine::executor::wasm::WasmJspiExecutor::new(),
+                ))
                 .build(),
-        ),
-        RuntimeFlavor::CurrentThread => Arc::new(
-            DefaultEngineBuilder::new(store)
-                .with_task_executor(Arc::new(TokioBackgroundExecutor::new()))
-                .build(),
-        ),
-        _ => panic!("unsupported runtime flavor"),
+        );
+    }
+
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let handle = tokio::runtime::Handle::current();
+        match handle.runtime_flavor() {
+            RuntimeFlavor::MultiThread => Arc::new(
+                DefaultEngineBuilder::new(store)
+                    .with_task_executor(Arc::new(TokioMultiThreadExecutor::new(handle)))
+                    .build(),
+            ),
+            RuntimeFlavor::CurrentThread => Arc::new(
+                DefaultEngineBuilder::new(store)
+                    .with_task_executor(Arc::new(TokioBackgroundExecutor::new()))
+                    .build(),
+            ),
+            _ => panic!("unsupported runtime flavor"),
+        }
     }
 }
 
@@ -659,6 +678,9 @@ pub fn to_uri(root: &Url, location: &Path) -> String {
                 location.as_ref()
             )
             .replace("file://", "");
+            // wasm32 has no local filesystem path; return the URL itself.
+            #[cfg(target_family = "wasm")]
+            let uri = root.as_ref().to_string();
             uri
         }
         #[cfg(target_os = "windows")]

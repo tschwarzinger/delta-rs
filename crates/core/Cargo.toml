@@ -70,14 +70,14 @@ sysinfo = { version = "0.38", default-features = false, features = ["system"] }
 tokio = { workspace = true, features = [
     "macros",
     "io-util",
-    "process",
     "rt",
-    "rt-multi-thread",
-    "signal",
     "sync",
-    "fs",
-    "parking_lot",
 ] }
+
+# The multi-threaded runtime and parking_lot features are only available on native targets;
+# tokio on wasm32-unknown-unknown supports only: sync, macros, io-util, rt, time. This
+# per-target table adds those features to the tokio declared above; Cargo unifies features
+# for whichever target is active.
 
 # caching
 foyer = { version = "0.22.2", optional = true, features = ["serde"] }
@@ -99,6 +99,10 @@ rand = "0.10"
 sqlparser = "0.62"
 humantime = { version = "2.1.0", optional = true }
 validator = { version = "0.19", features = ["derive"] }
+
+# Native-only: the tokio multi-threaded runtime and parking_lot (unsupported on wasm).
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+tokio = { workspace = true, features = ["rt-multi-thread", "parking_lot"] }
 
 [dev-dependencies]
 arrow = { workspace = true, features = ["prettyprint"]}
@@ -135,8 +139,9 @@ cloud = ["object_store/cloud", "dep:humantime"]
 # enable caching some file I/O operations when scanning delta logs
 delta-cache = ["foyer", "tempfile", "url/serde"]
 
-# Experimental support for nanosecond timestamps primitive type
-nanosecond-timestamps = ["delta_kernel/nanosecond-timestamps"]
+# Experimental support for nanosecond timestamps primitive type. Delta-rs gates this purely in its
+# own code (there is no matching feature on the 0.28 fork kernel anymore).
+nanosecond-timestamps = []
 
 integration_test = []
 

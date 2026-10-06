@@ -120,7 +120,11 @@ pub use arrow;
 pub use datafusion;
 pub use parquet;
 
-#[cfg(not(any(feature = "rustls", feature = "native-tls")))]
+// TLS is provided by the browser on wasm32 (fetch), so no rustls/native-tls feature is required.
+#[cfg(all(
+    not(target_family = "wasm"),
+    not(any(feature = "rustls", feature = "native-tls"))
+))]
 compile_error!("You must enable at least one of the features: `rustls` or `native-tls`.");
 
 /// Creates and loads a DeltaTable from the given URL with current metadata.

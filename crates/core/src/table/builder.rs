@@ -251,6 +251,14 @@ fn resolve_uri_type(table_uri: impl AsRef<str>) -> DeltaResult<UriType> {
         Ok(url) => {
             let scheme = url.scheme().to_string();
             if url.scheme() == "file" {
+                // wasm32 has no local filesystem, so `file://` URLs cannot be turned into a path.
+                #[cfg(target_family = "wasm")]
+                {
+                    return Err(DeltaTableError::InvalidTableLocation(format!(
+                        "file:// table locations are not supported on wasm32: {table_uri}"
+                    )));
+                }
+                #[cfg(not(target_family = "wasm"))]
                 Ok(UriType::LocalPath(url.to_file_path().map_err(|err| {
                     let msg = format!("Invalid table location: {table_uri}\nError: {err:?}");
                     DeltaTableError::InvalidTableLocation(msg)
@@ -302,6 +310,14 @@ pub fn parse_table_uri(table_uri: impl AsRef<str>) -> DeltaResult<Url> {
     let uri_type: UriType = resolve_uri_type(table_uri)?;
 
     let mut url = match uri_type {
+        // Local filesystem paths are unsupported on wasm32.
+        #[cfg(target_family = "wasm")]
+        UriType::LocalPath(_) => {
+            return Err(DeltaTableError::InvalidTableLocation(format!(
+                "Local filesystem paths are not supported on wasm32: {table_uri}"
+            )));
+        }
+        #[cfg(not(target_family = "wasm"))]
         UriType::LocalPath(path) => {
             let path = std::fs::canonicalize(&path).map_err(|err| {
                 let msg = format!(
@@ -335,6 +351,14 @@ pub fn ensure_table_uri(table_uri: impl AsRef<str>) -> DeltaResult<Url> {
 
     // If it is a local path, we need to create it if it does not exist.
     let url = match uri_type {
+        // Local filesystem paths are unsupported on wasm32.
+        #[cfg(target_family = "wasm")]
+        UriType::LocalPath(_) => {
+            return Err(DeltaTableError::InvalidTableLocation(format!(
+                "Local filesystem paths are not supported on wasm32: {table_uri}"
+            )));
+        }
+        #[cfg(not(target_family = "wasm"))]
         UriType::LocalPath(path) => {
             if !path.exists() {
                 std::fs::create_dir_all(&path).map_err(|err| {

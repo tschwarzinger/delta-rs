@@ -24,11 +24,15 @@ fn io_rt(config: Option<&RuntimeConfig>) -> &Runtime {
     IO_RT.get_or_init(|| {
         let rt = match config {
             Some(config) => {
+                // On wasm32 there is no multi-threaded runtime; always build a current-thread one.
+                #[cfg(not(target_family = "wasm"))]
                 let mut builder = if let Some(true) = config.multi_threaded {
                     RuntimeBuilder::new_multi_thread()
                 } else {
                     RuntimeBuilder::new_current_thread()
                 };
+                #[cfg(target_family = "wasm")]
+                let mut builder = RuntimeBuilder::new_current_thread();
 
                 if let Some(threads) = config.worker_threads {
                     builder.worker_threads(threads);
@@ -59,7 +63,10 @@ fn io_rt(config: Option<&RuntimeConfig>) -> &Runtime {
                     )
                     .build()
             }
+            #[cfg(not(target_family = "wasm"))]
             _ => Runtime::new(),
+            #[cfg(target_family = "wasm")]
+            _ => RuntimeBuilder::new_current_thread().build(),
         };
         rt.expect("Failed to create a tokio runtime for IO.")
     })
