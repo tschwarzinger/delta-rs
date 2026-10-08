@@ -267,6 +267,7 @@ pub(crate) fn canonical_table_root_identity(root: &url::Url) -> url::Url {
     root
 }
 
+#[cfg(not(target_family = "wasm"))]
 fn canonical_local_table_root_url(root: &url::Url) -> Option<url::Url> {
     let path = root.to_file_path().ok()?;
     let canonical_path = std::fs::canonicalize(path).ok()?;
@@ -275,6 +276,12 @@ fn canonical_local_table_root_url(root: &url::Url) -> Option<url::Url> {
     Some(ensure_table_root_url(&normalize_table_url(&canonical_root)))
 }
 
+#[cfg(target_family = "wasm")]
+fn canonical_local_table_root_url(root: &url::Url) -> Option<url::Url> {
+    Some(root.clone())
+}
+
+#[cfg(not(target_family = "wasm"))]
 fn canonical_local_file_url(url: &url::Url) -> Option<url::Url> {
     if url.scheme() != "file" {
         return None;
@@ -282,6 +289,14 @@ fn canonical_local_file_url(url: &url::Url) -> Option<url::Url> {
     let path = url.to_file_path().ok()?;
     let canonical_path = std::fs::canonicalize(path).ok()?;
     Url::from_file_path(canonical_path).ok()
+}
+
+#[cfg(target_family = "wasm")]
+fn canonical_local_file_url(url: &url::Url) -> Option<url::Url> {
+    if url.scheme() != "file" {
+        return None;
+    }
+    Some(url.clone())
 }
 
 fn strip_url_sensitive_parts(url: &mut Url) {

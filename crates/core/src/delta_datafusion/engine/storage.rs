@@ -6,12 +6,17 @@ use dashmap::mapref::one::Ref;
 use datafusion::execution::TaskContext;
 use datafusion::execution::object_store::{ObjectStoreRegistry, ObjectStoreUrl};
 use delta_kernel::{DeltaResult, Error as DeltaError, FileMeta, FileSlice, StorageHandler};
+#[cfg(not(target_family = "wasm"))]
 use delta_kernel_default_engine::executor::tokio::{
     TokioBackgroundExecutor, TokioMultiThreadExecutor,
 };
+#[cfg(target_family = "wasm")]
+use delta_kernel_default_engine::executor::wasm::WasmJspiExecutor;
 use delta_kernel_default_engine::filesystem::ObjectStoreStorageHandler;
 use itertools::Itertools;
-use tokio::runtime::{Handle, RuntimeFlavor};
+use tokio::runtime::Handle;
+#[cfg(not(target_family = "wasm"))]
+use tokio::runtime::RuntimeFlavor;
 use url::Url;
 
 #[derive(Clone)]
@@ -50,6 +55,12 @@ impl DataFusionStorageHandler {
             .get_store(url.as_ref())
             .map_err(DeltaError::generic_err)?;
 
+        #[cfg(target_family = "wasm")]
+        let handler: Arc<dyn StorageHandler> = Arc::new(ObjectStoreStorageHandler::new(
+            store,
+            Arc::new(WasmJspiExecutor::new()),
+        ));
+        #[cfg(not(target_family = "wasm"))]
         let handler: Arc<dyn StorageHandler> = match self.handle.runtime_flavor() {
             RuntimeFlavor::MultiThread => Arc::new(ObjectStoreStorageHandler::new(
                 store,

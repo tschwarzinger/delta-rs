@@ -11,12 +11,19 @@ use delta_kernel::{
     ParquetHandler, PredicateRef, error::DeltaResult as KernelResult, schema::SchemaRef,
 };
 use delta_kernel_default_engine::{
-    executor::tokio::{TokioBackgroundExecutor, TokioMultiThreadExecutor},
     json::DefaultJsonHandler,
     parquet::DefaultParquetHandler,
 };
+#[cfg(not(target_family = "wasm"))]
+use delta_kernel_default_engine::executor::tokio::{
+    TokioBackgroundExecutor, TokioMultiThreadExecutor,
+};
+#[cfg(target_family = "wasm")]
+use delta_kernel_default_engine::executor::wasm::WasmJspiExecutor;
 use itertools::Itertools;
-use tokio::runtime::{Handle, RuntimeFlavor};
+use tokio::runtime::Handle;
+#[cfg(not(target_family = "wasm"))]
+use tokio::runtime::RuntimeFlavor;
 
 use super::storage::{AsObjectStoreUrl, group_by_store};
 
@@ -55,6 +62,12 @@ impl DataFusionFileFormatHandler {
             .get_store(url.as_ref())
             .map_err(delta_kernel::Error::generic_err)?;
 
+        #[cfg(target_family = "wasm")]
+        let handler: Arc<dyn ParquetHandler> = Arc::new(DefaultParquetHandler::new(
+            store,
+            Arc::new(WasmJspiExecutor::new()),
+        ));
+        #[cfg(not(target_family = "wasm"))]
         let handler: Arc<dyn ParquetHandler> = match self.handle.runtime_flavor() {
             RuntimeFlavor::MultiThread => Arc::new(DefaultParquetHandler::new(
                 store,
@@ -83,6 +96,12 @@ impl DataFusionFileFormatHandler {
             .get_store(url.as_ref())
             .map_err(delta_kernel::Error::generic_err)?;
 
+        #[cfg(target_family = "wasm")]
+        let handler: Arc<dyn JsonHandler> = Arc::new(DefaultJsonHandler::new(
+            store,
+            Arc::new(WasmJspiExecutor::new()),
+        ));
+        #[cfg(not(target_family = "wasm"))]
         let handler: Arc<dyn JsonHandler> = match self.handle.runtime_flavor() {
             RuntimeFlavor::MultiThread => Arc::new(DefaultJsonHandler::new(
                 store,

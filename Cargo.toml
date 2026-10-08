@@ -17,11 +17,11 @@ repository = "https://github.com/delta-io/delta.rs"
 
 [workspace.dependencies]
 # Fork with wasm32-unknown-unknown support ported to the 0.28 kernel API level.
-delta_kernel = { package = "delta_kernel", git = "https://github.com/tschwarzinger/delta-kernel-rs", rev = "95d63a5f1a014daac6af38cf02dad2667b1c035f", features = [
+delta_kernel = { package = "delta_kernel", git = "https://github.com/tschwarzinger/delta-kernel-rs", rev = "d9b4064cde6f5ea4a3573c3f7849f985f711b0ca", features = [
     "arrow-59",
     "internal-api",
 ] }
-delta_kernel_default_engine = { package = "delta_kernel_default_engine", git = "https://github.com/tschwarzinger/delta-kernel-rs", rev = "95d63a5f1a014daac6af38cf02dad2667b1c035f", features = ["arrow-59"], default-features = false }
+delta_kernel_default_engine = { package = "delta_kernel_default_engine", git = "https://github.com/tschwarzinger/delta-kernel-rs", rev = "d9b4064cde6f5ea4a3573c3f7849f985f711b0ca", features = ["arrow-59"], default-features = false }
 
 
 # arrow
@@ -158,3 +158,4 @@ inherits = "release"
 opt-level = 3
 codegen-units = 1
 lto = "thin"
+

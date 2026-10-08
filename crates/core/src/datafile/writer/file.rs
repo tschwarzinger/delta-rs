@@ -34,10 +34,10 @@ fn upload_part_size() -> usize {
                     // Minimum part size in GCS and S3
                     debug!("DELTARS_UPLOAD_PART_SIZE must be at least 5MB, therefore falling back on default of 5MB.");
                     DEFAULT_UPLOAD_PART_SIZE
-                } else if size > 1024 * 1024 * 1024 * 5 {
+                } else if (size as u64) > 1024 * 1024 * 1024 * 5u64 {
                     // Maximum part size in GCS and S3
                     debug!("DELTARS_UPLOAD_PART_SIZE must not be higher than 5GB, therefore capping it at 5GB.");
-                    1024 * 1024 * 1024 * 5
+                    (1024 * 1024 * 1024 * 5u64).try_into().unwrap_or(usize::MAX)
                 } else {
                     size
                 }
