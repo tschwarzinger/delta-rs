@@ -38,10 +38,21 @@ where
     let dispatch = dispatcher::get_default(|d| d.clone());
     let span = Span::current();
 
-    tokio::task::spawn_blocking(move || {
-        dispatcher::with_default(&dispatch, || {
-            let _enter = span.enter();
-            f()
+    // On wasm there is no OS thread pool (and no LocalSet), so we run the closure
+    // as a regular task on the cooperative runtime. On native we keep using the
+    // dedicated blocking pool so CPU-bound work stays off the I/O threads.
+    #[cfg(not(target_family = "wasm"))]
+    {
+        tokio::task::spawn_blocking(move || {
+            dispatcher::with_default(&dispatch, || {
+                let _enter = span.enter();
+                f()
+            })
         })
-    })
+    }
+    #[cfg(target_family = "wasm")]
+    {
+        let _ = (dispatch, span);
+        tokio::task::spawn(async move { f() })
+    }
 }

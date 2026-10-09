@@ -3,6 +3,7 @@
 use arrow::{datatypes::SchemaRef, record_batch::RecordBatch};
 use futures::stream::BoxStream;
 use futures::{Stream, StreamExt};
+use std::future::Future;
 use std::pin::Pin;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::task::JoinSet;
@@ -94,6 +95,7 @@ impl<O: Send + 'static> ReceiverStreamBuilder<O> {
     ///
     /// This is often used to spawn tasks that write to the sender
     /// retrieved from `Self::tx`.
+    #[cfg(not(target_family = "wasm"))]
     pub fn spawn_blocking<F>(&mut self, f: F)
     where
         F: FnOnce() -> DeltaResult<()>,
@@ -109,6 +111,19 @@ impl<O: Send + 'static> ReceiverStreamBuilder<O> {
                 f()
             })
         });
+    }
+
+    /// On wasm there are no OS threads to run `spawn_blocking` work on, so the
+    /// caller passes an async producer (using `send().await` instead of
+    /// `blocking_send`) and we spawn it onto the cooperative runtime.
+    #[cfg(target_family = "wasm")]
+    pub fn spawn_blocking<F>(&mut self, f: F)
+    where
+        F: Future<Output = DeltaResult<()>> + Send + 'static,
+    {
+        let _ = dispatcher::get_default(|d| d.clone());
+        let _ = Span::current();
+        self.join_set.spawn(f);
     }
 
     /// Create a stream of all data written to `tx`

@@ -173,9 +173,16 @@ where
                         let table_root = this.table_root.clone();
                         let tx = this.dv_stream.tx();
 
+                        #[cfg(not(target_family = "wasm"))]
                         let load_dv = move || {
                             let dv = dv_info.get_selection_vector(engine.as_ref(), &table_root)?;
                             let _ = tx.blocking_send(Ok((file_url, dv, num_records, cardinality)));
+                            Ok(())
+                        };
+                        #[cfg(target_family = "wasm")]
+                        let load_dv = async move {
+                            let dv = dv_info.get_selection_vector(engine.as_ref(), &table_root)?;
+                            let _ = tx.send(Ok((file_url, dv, num_records, cardinality))).await;
                             Ok(())
                         };
                         this.dv_stream.spawn_blocking(load_dv);

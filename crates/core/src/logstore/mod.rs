@@ -303,6 +303,20 @@ pub fn logstore_with(
     location: &Url,
     storage_config: StorageConfig,
 ) -> DeltaResult<LogStoreRef> {
+    // HTTP(S) schemes reconstruct as `{scheme}://` with an empty host, which cannot
+    // be parsed nor used as a factory key (and delta-rs has no builtin HTTP backend).
+    // Build a `DefaultLogStore` directly over the supplied object store; the object
+    // store still carries the actual I/O, so the location is purely a path prefix.
+    if location.scheme() == "http" || location.scheme() == "https" {
+        let prefixed_store = storage_config.decorate_store(root_store.clone(), location)?;
+        return Ok(default_logstore(
+            Arc::new(prefixed_store),
+            root_store,
+            location,
+            &storage_config,
+        ));
+    }
+
     let scheme = Url::parse(&format!("{}://", location.scheme()))
         .map_err(|_| DeltaTableError::InvalidTableLocation(location.clone().into()))?;
 

@@ -1022,7 +1022,8 @@ impl Snapshot {
             }
         };
 
-        builder.spawn_blocking(move || {
+        #[cfg(not(target_family = "wasm"))]
+        let producer = move || {
             for res in remove_data {
                 let batch = ArrowEngineData::try_from_engine_data(res?.actions)?.into();
                 if tx.blocking_send(Ok(batch)).is_err() {
@@ -1030,7 +1031,19 @@ impl Snapshot {
                 }
             }
             Ok(())
-        });
+        };
+        #[cfg(target_family = "wasm")]
+        let producer = async move {
+            for res in remove_data {
+                let batch = ArrowEngineData::try_from_engine_data(res?.actions)?.into();
+                if tx.send(Ok(batch)).await.is_err() {
+                    break;
+                }
+            }
+            Ok(())
+        };
+
+        builder.spawn_blocking(producer);
 
         builder
             .build()
